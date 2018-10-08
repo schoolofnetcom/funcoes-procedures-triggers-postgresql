@@ -1,0 +1,176 @@
+#CRIANDO SUA PRIMEIRA FUNCAO
+
+create funtion inc(val integer)
+RETURNS integer AS $$
+BEGIN
+RETURN val + 1;
+END; $$
+language plpgsql;
+
+#PARAMETRO DO TIPO IN
+create function get_sum(a numeric, b numeric)
+RETURNS numeric $$
+BEGIN
+ RETURN a + b;
+END; $$
+language plpgsql;
+
+#PARAMETRO DO TIPO OUT
+
+cretae function alto_baixo(a numeric, b numeric, c numeric, OUT high numeric, OUT low numeric)
+RETURNS numeric as $$
+BEGIN
+high := GREATEST(a,b,c);
+low := LEAST(a,b,c);
+END; $$
+language plpgsql;
+
+#PARAMETRO DO TIPO INOUT
+create funtion quadrado(INOUT a numeric)
+AS $$
+BEGIN
+a := a * a
+END; $$
+language plpgsql;
+
+#PARAMETRO DO TIPO VARIADIC
+create function sum_avg(variadic list numeric[], out total numeric, out average numeric)
+as $$
+BEGIN
+SELECT INTO total sum(list[i])
+from generate_subscripts(list.1) g(i);
+
+SELECT INTO average AVG(list[i])
+from generate_subscripts(list.1) g(i);
+END; $$
+language plpgsql;
+
+#Criando funções flexíveis com functions overloading
+create funtion tempo_duracao_aluguel(p_customer_id integer)
+RETURNS integer as $$
+
+DECLARE
+ rental_duration integer;
+ BEGIN
+ SELECT INTO rental_duration SUM(extract(DAY FROM return_date - rental_date)
+ FROM rental
+ where customer_id=p_customer_id and rental_date >= p_from_date;
+
+ return RENTAL_DURATION;
+ END; $$
+ labguage plpgsql;
+
+#Funções que retornam tabelas
+create function busca_filmes (p_padrao varchar)
+RETURNS table (
+film_title varchar,
+film_release_year int
+)
+as $$
+BEGIN
+RETURN query select
+title,
+cast(release_year as integer)
+from
+film
+where title ilike p_padrao;
+END; $$
+language plpgsql;
+
+#Estrutura de controle condicionais com if then e else
+create function calcula_salario_if(salario dec(8,2))
+returns dec(8,2) as $$
+begin
+declare valor_imposto dec(8,2)
+if salario < 1000.00 then
+set valor_imposto = 0.00;
+elsif salario < 2000.00 then
+set valor_imposto = salario * 0.15;
+elsif salario < 3000.00
+set valor_imposto = salario * 0.22;
+else
+set valor_imposto = salario * 0.27;
+end if;
+return valor_imposto;
+END; $$
+
+#Estruturas de controle condicionais com case
+creaye function busca_preco_segmento
+retuns varchar(50) as $$
+declare
+rate numeric;
+price_segment varchar(50);
+BEGIN
+select into rate rental_rate
+from film
+where film_id = p_film_id;
+
+case rate when 0.99 then
+price_segment := 'baixo';
+when 2.99 then
+price_segment := 'medio';
+when 4.99 then
+price_segment := 'alto';
+else
+price_segment := 'nao especificado';
+END CASE;
+return price_segment;
+END; $$
+language plpgsql;
+
+#Estruturas de controle repetitivas
+CREATE OR REPLACE FUNCTION fibonacci (n INTEGER) 
+ RETURNS INTEGER AS $$ 
+DECLARE
+   counter INTEGER := 0 ; 
+   i INTEGER := 0 ; 
+   j INTEGER := 1 ;
+BEGIN
+ 
+ IF (n < 1) THEN
+ RETURN 0 ;
+ END IF; 
+ 
+ LOOP 
+ EXIT WHEN counter = n ; 
+ counter := counter + 1 ; 
+ SELECT j, i + j INTO i, j ;
+ END LOOP ; 
+ 
+ RETURN i ;
+END ; 
+$$ LANGUAGE plpgsql;
+
+#CRIANDO TRIGGERS
+
+CREATE TABLE empregados(
+   id serial primary key,
+   nome varchar(40) NOT NULL,
+   sobrenome varchar(40) NOT NULL
+);
+
+CREATE TABLE empregados_auditoria (
+   id serial primary key,
+   nome varchar(40) NOT NULL,
+   sobrenome varchar(40) NOT NULL,
+   data_alteracao timestamp NOT NULL
+)
+
+CREATE OR REPLACE FUNCTION log_last_name_changes()
+  RETURNS trigger AS
+$BODY$
+BEGIN
+ IF NEW.sobrenome <> OLD.sobrenome THEN
+ INSERT INTO empregados_auditoria(id,nome,sobrenome_data_alteracao)
+ VALUES(OLD.id,OLD.sobrenome,now());
+ END IF;
+ 
+ RETURN NEW;
+END;
+$BODY$
+
+CREATE TRIGGER mudancas_sobrenome
+  BEFORE UPDATE
+  ON empregados
+  FOR EACH ROW
+  EXECUTE PROCEDURE log_last_name_changes();
